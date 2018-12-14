@@ -1,0 +1,1 @@
+Test projects for MSBuild static graph
