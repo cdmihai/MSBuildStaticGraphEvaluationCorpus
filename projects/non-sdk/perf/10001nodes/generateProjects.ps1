@@ -45,4 +45,7 @@ $rootProject = [System.String]::Format($projectWithReferences, $sb)
 
 echo $rootProject > "$root\0.proj"
 
+. ..\..\..\Test.ps1
+
+
 ..\..\..\..\src\msb\bin\Debug\net472\msb.exe "E:\projects\msbuild\artifacts\Debug\bootstrap\net472\MSBuild\Current\Bin" "-noConsoleLogger" "-buildWithCacheRoundtrip" $caches $root "proj"
