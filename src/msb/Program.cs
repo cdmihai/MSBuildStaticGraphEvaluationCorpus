@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,9 +8,9 @@ using System.Threading;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
-using Microsoft.Build.Experimental.Graph;
 using Microsoft.Build.Locator;
 using Microsoft.Build.Logging;
+using Microsoft.Build.Experimental.Graph;
 
 namespace msb
 {
@@ -23,7 +21,12 @@ namespace msb
         private const string NoConsoleLoggerArg = "-noConsoleLogger";
         private const string BuildManagerArg = "-buildWithBuildManager";
 
+#if RELEASE
         private static readonly bool DebugBuild = false;
+#else
+        private static readonly bool DebugBuild = true;
+#endif
+
         private static bool _noConsoleLogger;
         private static int _minimumArgumentCount;
         private static int _executionTypeIndex;
@@ -265,9 +268,14 @@ namespace msb
                 graph = new ProjectGraph(projectFiles, null, collection);
             }
 
+            if (DebugBuild)
+            {
+                Console.WriteLine(graph.ToDot());
+            }
+
             var cacheFiles = new Dictionary<ProjectGraphNode, string>(graph.ProjectNodes.Count);
 
-            var nodeBuildData = graph.GetBuildData(new[] {"Build"});
+            var targetLists = graph.GetTargetLists(null);
 
             var topoSortedNodes = graph.ProjectNodesTopologicallySorted;
 
@@ -279,9 +287,9 @@ namespace msb
 
                 cacheFiles[node] = outputCacheFile;
 
-                var buildData = nodeBuildData[node];
+                var targets = targetLists[node];
 
-                var result = BuildProject(node.ProjectInstance.FullPath, buildData.GlobalProperties, buildData.Targets, inputCachesFiles, outputCacheFile);
+                var result = BuildProject(node.ProjectInstance.FullPath, node.ProjectInstance.GlobalProperties, targets, inputCachesFiles, outputCacheFile);
 
                 if (result.OverallResult == BuildResultCode.Failure)
                 {
@@ -294,7 +302,7 @@ namespace msb
 
         private static BuildResult BuildProject(
             string projectInstanceFullPath,
-            IReadOnlyDictionary<string, string> globalProperties,
+            IDictionary<string, string> globalProperties,
             IReadOnlyCollection<string> entryTargets,
             string[] inputCachesFiles,
             string outputCacheFile)

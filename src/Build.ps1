@@ -1,5 +1,12 @@
-& "$PSScriptRoot\BuildRepos.ps1" -configuration Release -BuildMSBuild -BuildSdk -RedirectEnvironmentToBuildOutputs
+param (
+    [string]$Configuration = "Release"
+)
 
-& "$env:MSBuildBootstrapBinDirectory/msbuild.exe" /restore "$PSScriptRoot\msb\msb.csproj"
+& "$PSScriptRoot\BuildRepos.ps1" -configuration $Configuration -BuildMSBuild -BuildSdk -RedirectEnvironmentToBuildOutputs
 
-$env:GraphTestApp = "$PSScriptRoot\msb\bin\Debug\net472\msb.exe"
+rm -Recurse -Force "$PSScriptRoot\msb\bin"
+rm -Recurse -Force "$PSScriptRoot\msb\obj"
+
+& "$env:MSBuildBootstrapExe" /restore "$PSScriptRoot\msb\msb.csproj" /p:"Configuration=$Configuration"
+
+$env:GraphTestApp = "$PSScriptRoot\msb\bin\$Configuration\net472\msb.exe"
