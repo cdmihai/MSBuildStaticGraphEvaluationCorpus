@@ -2,7 +2,7 @@ param (
     [switch]$BuildSdk,
     [switch]$BuildMSBuild,
     [switch]$RedirectEnvironmentToBuildOutputs,
-    [string]$Repos = [System.IO.Path]::Combine($PSScriptRoot, "rps"),
+    [string]$Repos,
     [string]$MSBuildBranch = "graph2",
     [string]$MSBuildRepoAddress = "https://github.com/cdmihai/msbuild.git",
     [string]$SDKBranch = "master",
@@ -10,35 +10,11 @@ param (
     [string]$Configuration = "Release"
 )
 
-function Combine([string]$root, [string]$subdirectory)
+. "$PSScriptRoot\Common.ps1"
+
+if (-not $Repos)
 {
-    return [System.IO.Path]::Combine($root, $subdirectory)
-}
-
-function CloneOrUpdateRepo([string]$address, [string] $branch, [string] $repoPath)
-{
-    if (Test-Path  $repoPath)
-    {
-        Push-Location $repoPath
-
-        & git fetch origin
-
-        & git checkout $branch
-
-        & git reset --hard "origin/$branch"
-
-        Pop-Location
-    }
-    else
-    {
-        & git clone $address $repoPath
-
-        Push-Location $repoPath
-
-        & git checkout $branch
-
-        Pop-Location
-    }
+    $Repos = Combine $sourceDirectory "rps"
 }
 
 function BuildMSBuildRepo([string]$MSBuildRepo)

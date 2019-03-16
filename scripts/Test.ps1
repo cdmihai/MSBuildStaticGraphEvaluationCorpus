@@ -1,16 +1,13 @@
 param([string]$projectExtension)
 
+. "$PSScriptRoot\Common.ps1"
+
 $invocationDirectory=(pwd).Path
 $msbuildBinaries=$env:MSBuildBootstrapBinDirectory
 $msbuildApp=$env:GraphTestApp
 
 echo "Using msbuild binaries from: $msbuildBinaries"
 echo "Using test app binaries from: $msbuildApp"
-
-function Combine([string]$root, [string]$subdirectory)
-{
-    return [System.IO.Path]::Combine($root, $subdirectory)
-}
 
 function BuildWithCacheRoundtripDefault([string] $projectRoot, [string] $projectFileExtension){
 
@@ -82,8 +79,8 @@ if ($projectExtension) {
 }
 
 $workingProjectRoots = @{
-    "$PSScriptRoot\non-sdk\working" = "proj";
-    "$PSScriptRoot\sdk\working" = "csproj"
+    "$projectsDirectory\non-sdk\working" = "proj";
+    "$projectsDirectory\sdk\working" = "csproj"
 }
 
 $brokenProjects = @("oldWPF1", "oldWPF-new-2")

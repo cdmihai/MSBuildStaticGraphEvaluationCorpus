@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Text;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
@@ -270,7 +271,7 @@ namespace msb
 
             if (DebugBuild)
             {
-                Console.WriteLine(graph.ToDot());
+                Console.WriteLine(ToDot(graph));
             }
 
             var cacheFiles = new Dictionary<ProjectGraphNode, string>(graph.ProjectNodes.Count);
@@ -396,6 +397,42 @@ namespace msb
                     Console.WriteLine($"\t{metadata.Name}={metadata.EvaluatedValue}");
                 }
             }
+        }
+
+        internal static string ToDot(ProjectGraph graph)
+        {
+            var nodeCount = 0;
+            return ToDot(graph, node => nodeCount++.ToString());
+        }
+
+        internal static string ToDot(ProjectGraph graph, Func<ProjectGraphNode, string> nodeIdProvider)
+        {
+            var nodeIds = new ConcurrentDictionary<ProjectGraphNode, string>();
+
+            var sb = new StringBuilder();
+
+            sb.Append("digraph g\n{\n\tnode [shape=box]\n");
+
+            foreach (var node in graph.ProjectNodes)
+            {
+                var nodeId = nodeIds.GetOrAdd(node, (n, idProvider) => idProvider(n), nodeIdProvider);
+
+                var nodeName = Path.GetFileNameWithoutExtension(node.ProjectInstance.FullPath);
+                var globalPropertiesString = string.Join("<br/>", node.ProjectInstance.GlobalProperties.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}={kvp.Value}"));
+
+                sb.AppendLine($"\t{nodeId} [label=<{nodeName}<br/>{globalPropertiesString}>]");
+
+                foreach (var reference in node.ProjectReferences)
+                {
+                    var referenceId = nodeIds.GetOrAdd(reference, (n, idProvider) => idProvider(n), nodeIdProvider);
+
+                    sb.AppendLine($"\t{nodeId} -> {referenceId}");
+                }
+            }
+
+            sb.Append("}");
+
+            return sb.ToString();
         }
     }
 
