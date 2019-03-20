@@ -4,17 +4,40 @@ function Combine
     return [System.IO.Path]::Combine($argsAsStrings)
 }
 
-function CloneOrUpdateRepo([string]$address, [string] $branch, [string] $repoPath, [bool] $updateIfExists = $true)
+function ToGitHash([string] $branchOrCommit)
 {
+    $refsString = (git show-ref --hash $branchOrCommit) | Out-String
+
+    if (-not $refsString)
+    {
+        $returnVal =  $branchOrCommit
+    }
+    else
+    {
+        $refs = $refsString -split '\s'
+
+        $firstRef = $refs[0]
+
+        $returnVal = $firstRef
+    }
+
+    return $returnVal
+}
+
+function CloneOrUpdateRepo([string]$address, [string] $location, [string] $repoPath, [bool] $updateIfExists = $true)
+{
+    $locationHash = ToGitHash $location
+
     if ((Test-Path  $repoPath) -and $updateIfExists)
     {
         Push-Location $repoPath
 
+        $locationHash = ToGitHash $location
+        echo "[$location] converted to [$locationHash]"
+
         & git fetch origin
 
-        & git checkout $branch
-
-        & git reset --hard "origin/$branch"
+        & git checkout $locationHash
 
         Pop-Location
     }
@@ -24,9 +47,12 @@ function CloneOrUpdateRepo([string]$address, [string] $branch, [string] $repoPat
 
         Push-Location $repoPath
 
+        $locationHash = ToGitHash $location
+        echo "[$location] converted to [$locationHash]"
+
         & git fetch origin
 
-        & git checkout $branch
+        & git checkout $locationHash
 
         Pop-Location
     }

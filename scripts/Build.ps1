@@ -1,10 +1,18 @@
 param (
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+    [switch]$BuildRepos
 )
 
 . "$PSScriptRoot\Common.ps1"
 
-& "$PSScriptRoot\BuildRepos.ps1" -configuration $Configuration -BuildMSBuild -BuildSdk -RedirectEnvironmentToBuildOutputs
+if ($BuildRepos)
+{
+    & "$PSScriptRoot\BuildRepos.ps1" -configuration $Configuration -BuildMSBuild -BuildSdk -RedirectEnvironmentToBuildOutputs
+}
+else
+{
+    & "$PSScriptRoot\BuildRepos.ps1" -configuration $Configuration -RedirectEnvironmentToBuildOutputs
+}
 
 rm -Recurse -Force "$sourceDirectory\msb\bin"
 rm -Recurse -Force "$sourceDirectory\msb\obj"

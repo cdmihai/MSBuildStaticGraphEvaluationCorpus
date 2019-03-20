@@ -5,6 +5,7 @@
 caches/
 generatedProjects/
 rps/
+repo/
 
 # User-specific files
 *.suo

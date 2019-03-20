@@ -36,9 +36,32 @@ function PrintHeader([string]$text)
     Write-Output ("=" * $line.Length)
 }
 
+function MaterializeRepo([string] $repoInfoFile, [string] $repoRoot)
+{
+    $repoInfo = Get-Content -Path $repoInfoFile
+
+    $repoAddress = $repoInfo[0]
+    $repoCommit = $repoInfo[1]
+
+    $repoDirectory = Combine $repoRoot "repo"
+
+    CloneOrUpdateRepo $repoAddress $repoCommit $repoDirectory
+}
+
+function MaterializeRepoIfNecessary([string]$projectRoot)
+{
+    $repoInfo = Combine $projectRoot "repoInfo"
+    
+    if (Test-Path $repoInfo)
+    {
+        echo "Materializing $repoInfo"
+        MaterializeRepo $repoInfo $projectRoot
+    }
+}
+
 function SetupTestProject([string]$projectRoot)
 {
-    echo "Cleaning $projectRoot"
+    echo "Cleaning bin and obj under $projectRoot"
 
     Remove-Item -Force -Recurse "$projectRoot\**\bin"
     Remove-Item -Force -Recurse "$projectRoot\**\obj"
@@ -54,14 +77,16 @@ function SetupTestProject([string]$projectRoot)
 
 function TestProject([string] $projectRoot, [string] $projectExtension)
 {
-    PrintHeader "BuildManager: $projectRoot"
-    SetupTestProject $projectRoot
-    BuildWithBuildManager $projectRoot $projectExtension
+    MaterializeRepoIfNecessary $projectRoot
 
-    if ($LASTEXITCODE -ne 0)
-    {
-        exit
-    }
+    # PrintHeader "BuildManager: $projectRoot"
+    # SetupTestProject $projectRoot
+    # BuildWithBuildManager $projectRoot $projectExtension
+
+    # if ($LASTEXITCODE -ne 0)
+    # {
+    #     exit
+    # }
 
     PrintHeader "Cache roundtrip: $projectRoot"
     SetupTestProject $projectRoot
