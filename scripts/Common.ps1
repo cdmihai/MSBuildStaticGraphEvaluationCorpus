@@ -1,3 +1,8 @@
+Set-StrictMode -Version Latest
+
+$InformationPreference = "Continue"
+$DebugPreference = "Continue"
+
 function Combine
 {
     [string[]] $argsAsStrings = $args
@@ -32,10 +37,12 @@ function CloneOrUpdateRepo([string]$address, [string] $location, [string] $repoP
     {
         Push-Location $repoPath
 
-        $locationHash = ToGitHash $location
-        echo "[$location] converted to [$locationHash]"
+        & git remote -v
 
         & git fetch origin
+
+        $locationHash = ToGitHash $location
+        Write-Information "[$location] converted to [$locationHash]"
 
         & git checkout $locationHash
 
@@ -48,7 +55,7 @@ function CloneOrUpdateRepo([string]$address, [string] $location, [string] $repoP
         Push-Location $repoPath
 
         $locationHash = ToGitHash $location
-        echo "[$location] converted to [$locationHash]"
+        Write-Information "[$location] converted to [$locationHash]"
 
         & git fetch origin
 

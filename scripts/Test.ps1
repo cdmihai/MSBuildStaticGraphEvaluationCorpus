@@ -1,29 +1,32 @@
-param([string]$projectExtension)
+param(
+    [string]$singleProjectDirectory,
+    [string]$projectExtension
+    )
 
 . "$PSScriptRoot\Common.ps1"
 
 $invocationDirectory=(pwd).Path
 $msbuildBinaries=$env:MSBuildBootstrapBinDirectory
-$msbuildApp=$env:GraphTestApp
+$msbuildApp=$env:MSBuildGraphTestApp
 
-echo "Using msbuild binaries from: $msbuildBinaries"
-echo "Using test app binaries from: $msbuildApp"
+Write-Information "Using msbuild binaries from: $msbuildBinaries"
+Write-Information "Using test app binaries from: $msbuildApp"
 
-function BuildWithCacheRoundtripDefault([string] $projectRoot, [string] $projectFileExtension){
+function BuildWithCacheRoundtripDefault([string] $projectRoot, [string] $projectFileExtension, [string] $solutionfile){
 
-    BuildWithCacheRoundtrip "true" $projectRoot "$projectRoot\caches" $projectFileExtension
+    BuildWithCacheRoundtrip "true" $projectRoot "$projectRoot\caches" $projectFileExtension $solutionFile
 }
 
-function BuildWithCacheRoundtrip([string] $useConsoleLogger, [string] $projectRoot, [string] $cacheRoot, [string] $projectFileExtension){
-    & $msbuildapp $msbuildBinaries $useConsolelogger "-buildWithCacheRoundtrip" $projectRoot $cacheRoot $projectFileExtension
+function BuildWithCacheRoundtrip([string] $useConsoleLogger, [string] $projectRoot, [string] $cacheRoot, [string] $projectFileExtension, [string] $solutionfile){
+    & $msbuildapp $msbuildBinaries $useConsolelogger "-buildWithCacheRoundtrip" $projectRoot $cacheRoot $projectFileExtension $solutionFile
 }
 
-function BuildwithBuildManager([string] $projectRoot, [string] $projectFileExtension){
-    & $msbuildapp $msbuildBinaries "true" "-buildWithBuildManager" $projectRoot $projectFileExtension
+function BuildwithBuildManager([string] $projectRoot, [string] $projectFileExtension, [string] $solutionFile){
+    & $msbuildapp $msbuildBinaries "true" "-buildWithBuildManager" $projectRoot $projectFileExtension $solutionFile
 }
 
 function BuildSingleProject($useConsoleLogger, $projectFile, $cacheRoot){
-    # echo "$msbuildapp $msbuildBinaries -buildWithCacheRoundtrip $invokingScriptDirectory\caches $invokingScriptDirectory"
+    # Write-Information "$msbuildapp $msbuildBinaries -buildWithCacheRoundtrip $invokingScriptDirectory\caches $invokingScriptDirectory"
 
     & $msbuildapp $msbuildBinaries $useConsoleLogger "-singleProject" $projectFile $cacheRoot
 }
@@ -31,37 +34,61 @@ function BuildSingleProject($useConsoleLogger, $projectFile, $cacheRoot){
 function PrintHeader([string]$text)
 {
     $line = "=========================$text========================="
-    Write-Output ("=" * $line.Length)
-    Write-Output $line
-    Write-Output ("=" * $line.Length)
+    Write-Information ("=" * $line.Length)
+    Write-Information $line
+    Write-Information ("=" * $line.Length)
 }
 
-function MaterializeRepo([string] $repoInfoFile, [string] $repoRoot)
+function GetRepoInfo([string] $repoRoot)
 {
-    $repoInfo = Get-Content -Path $repoInfoFile
+    $repoInfoFile = Combine $projectRoot "repoInfo"
 
-    $repoAddress = $repoInfo[0]
-    $repoCommit = $repoInfo[1]
+    if (Test-Path $repoInfoFile)
+    {
+        $repoInfo = [PSCustomObject](Get-Content $repoInfoFile | ConvertFrom-Json)
 
-    $repoDirectory = Combine $repoRoot "repo"
+        $repoDirectory = Combine $repoRoot "repo"
+        $repoInfo | Add-Member -MemberType NoteProperty -Name "RepoDirectory" -Value $repoDirectory
+
+        if ($null -ne $repoInfo.SolutionFile)
+        {
+            $repoInfo.SolutionFile = Combine $repoInfo.RepoDirectory $repoInfo.SolutionFile
+        }
+
+        return $repoInfo
+    }
+    else
+    {
+        return [PSCustomObject]@{
+            RepoAddress = $null
+            RepoLocation = $null
+            SolutionFile = $null
+            RepoDirectory = $null
+        }
+    }
+}
+
+function MaterializeRepo([PSCustomObject] $repoInfo, [string] $repoRoot)
+{
+    $repoAddress = $repoInfo.RepoAddress
+    $repoCommit = $repoInfo.RepoLocation
+    $repoDirectory = $repoInfo.RepoDirectory
 
     CloneOrUpdateRepo $repoAddress $repoCommit $repoDirectory
 }
 
-function MaterializeRepoIfNecessary([string]$projectRoot)
+function MaterializeRepoIfNecessary([PSCustomObject]$repoInfo)
 {
-    $repoInfo = Combine $projectRoot "repoInfo"
-    
-    if (Test-Path $repoInfo)
+    if ($null -ne $repoInfo.RepoAddress)
     {
-        echo "Materializing $repoInfo"
+        Write-Information "Materializing $($repoInfo.RepoAddress)"
         MaterializeRepo $repoInfo $projectRoot
     }
 }
 
-function SetupTestProject([string]$projectRoot)
+function SetupTestProject([string]$projectRoot, [PSCustomObject]$repoInfo)
 {
-    echo "Cleaning bin and obj under $projectRoot"
+    Write-Information "   Cleaning bin and obj under $projectRoot"
 
     Remove-Item -Force -Recurse "$projectRoot\**\bin"
     Remove-Item -Force -Recurse "$projectRoot\**\obj"
@@ -70,27 +97,49 @@ function SetupTestProject([string]$projectRoot)
 
     if (Test-Path $setupScript)
     {
-        echo "running $setupScript"
-        & $setupScript
+        $projectDir = if ($null -ne $repoInfo.RepoDirectory)
+        {
+            $repoInfo.RepoDirectory
+        }
+        else
+        {
+            $projectRoot
+        }
+
+        Write-Information "   running $setupScript"
+        & $setupScript -repoDirectory $projectDir -solutionFile $repoInfo.SolutionFile
     }
 }
 
 function TestProject([string] $projectRoot, [string] $projectExtension)
 {
-    MaterializeRepoIfNecessary $projectRoot
+    $repoInfo = GetRepoInfo $projectRoot
 
-    # PrintHeader "BuildManager: $projectRoot"
-    # SetupTestProject $projectRoot
-    # BuildWithBuildManager $projectRoot $projectExtension
+    Write-Information $repoInfo
 
-    # if ($LASTEXITCODE -ne 0)
-    # {
-    #     exit
-    # }
+    MaterializeRepoIfNecessary $repoInfo
 
+    $solutionFile = if ($null -ne $repoInfo.SolutionFile)
+    {
+        $repoInfo.SolutionFile
+    }
+    else
+    {
+        $null
+    }
+
+    SetupTestProject $projectRoot $repoInfo
+    PrintHeader "BuildManager: $projectRoot"
+    BuildWithBuildManager $projectRoot $projectExtension $solutionFile
+
+    if ($LASTEXITCODE -ne 0)
+    {
+        exit
+    }
+
+    SetupTestProject $projectRoot $repoInfo
     PrintHeader "Cache roundtrip: $projectRoot"
-    SetupTestProject $projectRoot
-    BuildWithCacheRoundtripDefault $projectRoot $projectExtension
+    BuildWithCacheRoundtripDefault $projectRoot $projectExtension $solutionFile
 
     if ($LASTEXITCODE -ne 0)
     {
@@ -98,17 +147,20 @@ function TestProject([string] $projectRoot, [string] $projectExtension)
     }
 }
 
-if ($projectExtension) {
-    TestProject $invocationDirectory $projectExtension
+if ($singleProjectDirectory) {
+    Write-Information "Single Project Mode"
+    TestProject $singleProjectDirectory $projectExtension
     exit
 }
+
+Write-Information "Batch Project Mode"
 
 $workingProjectRoots = @{
     "$projectsDirectory\non-sdk\working" = "proj";
     "$projectsDirectory\sdk\working" = "csproj"
 }
 
-$brokenProjects = @("oldWPF1", "oldWPF-new-2")
+$brokenProjects = @("oldWPF1", "oldWPF-new-2", "new2-directInnerBuildReference")
 
 foreach ($directoryWithProjects in $workingProjectRoots.Keys)
 {

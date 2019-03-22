@@ -1,2 +1,5 @@
-https://github.com/OrchardCMS/Orchard.git
-c491990a0e05cefff2606171cc7dba70283b478f
+{
+    "RepoAddress": "https://github.com/OrchardCMS/Orchard.git",
+    "RepoLocation": "c491990a0e05cefff2606171cc7dba70283b478f",
+    "SolutionFile": "src/Orchard.sln"
+}
