@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -9,14 +10,16 @@ namespace GraphGen
 {
     public class GraphVisNode
     {
-        private readonly ProjectGraphNode _node;
         private readonly string _label;
 
+        public ProjectGraphNode Node { get; }
+        public ImmutableList<string> Targets { get; }
         public string Name { get; }
 
-        public GraphVisNode(ProjectGraphNode node)
+        public GraphVisNode(ProjectGraphNode node, ImmutableList<string> targets = null)
         {
-            _node = node;
+            Node = node;
+            Targets = targets;
             var (name, label) = GetNodeInfo(node);
             Name = name;
             _label = label;
@@ -25,13 +28,24 @@ namespace GraphGen
         internal string Create()
         {
             
-            var globalPropertiesString = string.Join("\n", _node.ProjectInstance.GlobalProperties.OrderBy(kvp => kvp.Key).Where(kvp => kvp.Key != "IsGraphBuild").Select(kvp => $"{kvp.Key}={kvp.Value}"));
+            var globalPropertiesString = string.Join("\n", Node.ProjectInstance.GlobalProperties.OrderBy(kvp => kvp.Key).Where(kvp => kvp.Key != "IsGraphBuild").Select(kvp => $"{kvp.Key}={kvp.Value}"));
             if (globalPropertiesString.StartsWith("TargetFramework="))
             {
                 globalPropertiesString = globalPropertiesString.Substring("TargetFramework=".Length);
             }
 
-            return $"  {Name} [label=\"{_label}\n{globalPropertiesString}\", shape=box];"; //, color=\"0.650 0.200 1.000\"];";
+            if (globalPropertiesString != "")
+            {
+                globalPropertiesString = "\n" + globalPropertiesString;
+            }
+
+            var buildTargetsString = "";
+            if (Targets != null)
+            {
+                buildTargetsString = "\nTargets={" + string.Join(",", Targets.Distinct()) +"}";
+            }
+
+            return $"  {Name} [label=\"{_label}{globalPropertiesString}{buildTargetsString}\", shape=box];"; //, color=\"0.650 0.200 1.000\"];";
         }
 
         // Ensure the same number is returned for the same ProjectGraphNode object

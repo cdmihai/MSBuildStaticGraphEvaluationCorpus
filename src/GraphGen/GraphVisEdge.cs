@@ -6,23 +6,24 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Build.Shared;
 
 namespace GraphGen
 {
     public class GraphVisEdge
     {
-        private readonly GraphVisNode _node1;
-        private readonly GraphVisNode _node2;
+        public GraphVisNode From { get; }
+        public GraphVisNode To { get;  }
 
-        public GraphVisEdge(GraphVisNode node1, GraphVisNode node2)
+        public GraphVisEdge(GraphVisNode from, GraphVisNode to)
         {
-            _node1 = node1;
-            _node2 = node2;
+            From = from;
+            To = to;
         }
 
         public string Create()
         {
-            return $"  {_node1.Name} -> {_node2.Name};"; //[color=\"0.002 0.999 0.999\"];";
+            return $"  {From.Name} -> {To.Name};";
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -16,31 +17,28 @@ namespace GraphGen
 {
     public class GraphVis
     {
-        public static string Create(ConcurrentDictionary<string, ProjectGraphNode> projects)
-        {
-            return Create(projects, new GraphVisOptions());
-        }
-
         public static string Create(ProjectGraph graphNodes)
         {
             return Create(graphNodes, new GraphVisOptions());
         }
 
-        public static string Create(ProjectGraph graphNodes, GraphVisOptions options)
+        public static string Create(ProjectGraph projectGraph, GraphVisOptions graphVisOptions, ICollection<string> targets = null)
         {
             // I don't really remember why I did the hash thing. I think I was concerned with duplicate nodes?
             var projects = new ConcurrentDictionary<string, ProjectGraphNode>();
 
-            foreach (var node in graphNodes.ProjectNodes)
+            foreach (var node in projectGraph.ProjectNodes)
             {
                 var propsHash = GraphVis.HashGlobalProps(node.ProjectInstance.GlobalProperties);
                 projects.TryAdd(node.ProjectInstance.FullPath + propsHash, node);
             }
 
-            return Create(projects, options);
+            var targetLists = projectGraph.GetTargetLists(targets);
+
+            return Create(projects, graphVisOptions, targetLists);
         }
 
-        public static string Create(ConcurrentDictionary<string, ProjectGraphNode> projects, GraphVisOptions options)
+        private static string Create(ConcurrentDictionary<string, ProjectGraphNode> projects, GraphVisOptions graphVisOptions, IReadOnlyDictionary<ProjectGraphNode, ImmutableList<string>> targetsLists = null)
         {
             HashSet<ProjectGraphNode> seen = new HashSet<ProjectGraphNode>();
 
@@ -53,37 +51,49 @@ namespace GraphGen
                 .Where(n => !n.Value.ProjectInstance.FullPath.Contains("dirs.proj"))
                 .GroupBy(kvp => kvp.Value.ProjectInstance.FullPath, (p, plist) => new { ProjectGroupName = p, Projects = projects.Where(p2=>p2.Value.ProjectInstance.FullPath == p).ToList()}))
             {
-                GraphVisCluster cluster = new GraphVisCluster(@group.ProjectGroupName);
+                GraphVisCluster graphVisCluster = new GraphVisCluster(@group.ProjectGroupName);
 
-                foreach (var node in @group.Projects)
+                foreach (var fromNode in @group.Projects)
                 {
-                    var graphNode = new GraphVisNode(node.Value);
-                    cluster.AddNode(graphNode);
-                    
-                    if (seen.Contains(node.Value)) continue;
-                    seen.Add(node.Value);
-                    
-                    //nodes.AppendLine(graphNode.Create());
-
-                    foreach (var subNode in node.Value.ProjectReferences)
+                    ImmutableList<string> fromNodeTargets = targetsLists?[fromNode.Value];
+                    if (fromNodeTargets == null)
                     {
-                        var subGraphVisNode = new GraphVisNode(subNode);
-                        var edgeString = new GraphVisEdge(graphNode, subGraphVisNode);
+                        // Nodes with no targets are not scheduled, so we skip them in the graph
+                        continue;
+                    }
 
-                        edges.AppendLine(edgeString.Create());
+                    var fromNodeGraphVisNode = new GraphVisNode(fromNode.Value, fromNodeTargets);
+                    graphVisCluster.AddNode(fromNodeGraphVisNode);
 
-                        //if (!seen.Contains(node.Value))
-                        //    nodes.AppendLine(subGraphVisNode.Create());
+                    if (seen.Contains(fromNode.Value))
+                    {
+                        continue;
+                    }
+
+                    seen.Add(fromNode.Value);
+                    
+                    foreach (var toNode in fromNode.Value.ProjectReferences)
+                    {
+                        ImmutableList<string> toNodeTargets = targetsLists?[toNode];
+                        if (toNodeTargets == null)
+                        {
+                            // If the target node is not scheduled, then we shouldn't draw the edge!
+                            continue;
+                        }
+
+                        var toNodeGraphVisNode = new GraphVisNode(toNode, toNodeTargets);
+                        var graphVisEdge = new GraphVisEdge(fromNodeGraphVisNode, toNodeGraphVisNode);
+                        edges.AppendLine(graphVisEdge.Create());
                     }
                 }
 
-                clusters.AppendLine(cluster.Create());
+                clusters.AppendLine(graphVisCluster.Create());
             }
 
             sb.AppendLine("digraph prof {");
             sb.AppendLine("  ratio = fill;");
-            sb.AppendLine($"  nodesep = {options.NodeSep};");
-            sb.AppendLine($"  ranksep = {options.RankSep};");
+            sb.AppendLine($"  nodesep = {graphVisOptions.NodeSep};");
+            sb.AppendLine($"  ranksep = {graphVisOptions.RankSep};");
             sb.AppendLine("  node [style=filled];");
             sb.Append(clusters);
             sb.Append(edges);
@@ -126,7 +136,7 @@ namespace GraphGen
                     throw new Exception($"Unknown extension: {outFileInfo.Extension}");
 
             }
-            
+
             byte[] output = wrapper.GenerateGraph(graphText, saveType);
             File.WriteAllBytes(outFile, output);
 
