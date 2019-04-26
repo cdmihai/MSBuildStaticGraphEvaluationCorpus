@@ -48,7 +48,7 @@ namespace GraphGen
             var clusters = new StringBuilder();
 
             foreach (var group in projects
-                .Where(n => !n.Value.ProjectInstance.FullPath.Contains("dirs.proj"))
+                //.Where(n => !n.Value.ProjectInstance.FullPath.Contains("dirs.proj"))
                 .GroupBy(kvp => kvp.Value.ProjectInstance.FullPath, (p, plist) => new { ProjectGroupName = p, Projects = projects.Where(p2=>p2.Value.ProjectInstance.FullPath == p).ToList()}))
             {
                 GraphVisCluster graphVisCluster = new GraphVisCluster(@group.ProjectGroupName);
@@ -56,11 +56,11 @@ namespace GraphGen
                 foreach (var fromNode in @group.Projects)
                 {
                     ImmutableList<string> fromNodeTargets = targetsLists?[fromNode.Value];
-                    if (fromNodeTargets == null)
-                    {
-                        // Nodes with no targets are not scheduled, so we skip them in the graph
-                        continue;
-                    }
+                    //if (fromNodeTargets == null)
+                    //{
+                    //    // Nodes with no targets are not scheduled, so we skip them in the graph
+                    //    continue;
+                    //}
 
                     var fromNodeGraphVisNode = new GraphVisNode(fromNode.Value, fromNodeTargets);
                     graphVisCluster.AddNode(fromNodeGraphVisNode);
@@ -75,11 +75,11 @@ namespace GraphGen
                     foreach (var toNode in fromNode.Value.ProjectReferences)
                     {
                         ImmutableList<string> toNodeTargets = targetsLists?[toNode];
-                        if (toNodeTargets == null)
-                        {
-                            // If the target node is not scheduled, then we shouldn't draw the edge!
-                            continue;
-                        }
+                        //if (toNodeTargets == null)
+                        //{
+                        //    // If the target node is not scheduled, then we shouldn't draw the edge!
+                        //    continue;
+                        //}
 
                         var toNodeGraphVisNode = new GraphVisNode(toNode, toNodeTargets);
                         var graphVisEdge = new GraphVisEdge(fromNodeGraphVisNode, toNodeGraphVisNode);
