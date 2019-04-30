@@ -45,7 +45,20 @@ namespace GraphGen
                 buildTargetsString = "\nTargets={" + string.Join(",", Targets.Distinct()) +"}";
             }
 
-            return $"  {Name} [label=\"{_label}{globalPropertiesString}{buildTargetsString}\", shape=box];"; //, color=\"0.650 0.200 1.000\"];";
+            var additionalGraphVis = "";
+
+            if (Node.ProjectReferences.Count == 0)
+            {
+                // Mark leaf nodes with light blue
+                additionalGraphVis += "color=\"0.650 0.200 1.000\"";
+            }
+
+            if (additionalGraphVis != "")
+            {
+                additionalGraphVis = ", " + additionalGraphVis;
+            }
+
+            return $"  {Name} [label=\"{_label}{globalPropertiesString}{buildTargetsString}\", shape=box{additionalGraphVis}];";
         }
 
         // Ensure the same number is returned for the same ProjectGraphNode object
